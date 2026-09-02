@@ -82,6 +82,8 @@ import org.eclipse.jdt.core.ToolFactory;
 import org.eclipse.jdt.core.WorkingCopyOwner;
 import org.eclipse.jdt.core.compiler.CharOperation;
 import org.eclipse.jdt.core.compiler.IScanner;
+import org.eclipse.jdt.core.compiler.ITerminalSymbols;
+import org.eclipse.jdt.core.compiler.InvalidInputException;
 import org.eclipse.jdt.core.dom.ASTNode;
 import org.eclipse.jdt.core.dom.ASTParser;
 import org.eclipse.jdt.core.dom.ASTVisitor;
@@ -100,7 +102,6 @@ import org.eclipse.jdt.core.dom.MethodDeclaration;
 import org.eclipse.jdt.core.dom.MethodInvocation;
 import org.eclipse.jdt.core.dom.Name;
 import org.eclipse.jdt.core.dom.NodeFinder;
-import org.eclipse.jdt.core.dom.PackageDeclaration;
 import org.eclipse.jdt.core.dom.SimpleName;
 import org.eclipse.jdt.core.dom.SingleVariableDeclaration;
 import org.eclipse.jdt.core.dom.SuperConstructorInvocation;
@@ -368,18 +369,46 @@ public final class JDTUtils {
 	}
 
 	public static String getPackageName(IJavaProject javaProject, String fileContent) {
-		if (fileContent == null) {
+		if (fileContent == null || fileContent.isEmpty()) {
 			return "";
 		}
-		//TODO probably not the most efficient way to get the package name as this reads the whole file;
-		char[] source = fileContent.toCharArray();
-		ASTParser parser = ASTParser.newParser(IASTSharedValues.SHARED_AST_LEVEL);
-		parser.setProject(javaProject);
-		parser.setIgnoreMethodBodies(true);
-		parser.setSource(source);
-		CompilationUnit ast = (CompilationUnit) parser.createAST(null);
-		PackageDeclaration pkg = ast.getPackage();
-		return (pkg == null || pkg.getName() == null)?"":pkg.getName().getFullyQualifiedName();
+		// Use ECJ Scanner instead of full AST parse — this avoids building an entire
+		// CompilationUnit object tree (~10-50x less allocation) just to extract the package declaration.
+		IScanner scanner = ToolFactory.createScanner(false, false, false, false);
+		scanner.setSource(fileContent.toCharArray());
+		try {
+			int token;
+			while ((token = scanner.getNextToken()) != ITerminalSymbols.TokenNameEOF) {
+				if (token == ITerminalSymbols.TokenNamepackage) {
+					return readQualifiedName(scanner);
+				}
+			}
+		} catch (InvalidInputException e) {
+			// fall through to return ""
+		}
+		return "";
+	}
+
+	/**
+	 * Reads a dotted qualified name from the scanner (e.g. "com.foo.bar") starting
+	 * from the current position, which should be just past the keyword token.
+	 */
+	private static String readQualifiedName(IScanner scanner) throws InvalidInputException {
+		StringBuilder sb = new StringBuilder();
+		int token = scanner.getNextToken();
+		while (token == ITerminalSymbols.TokenNameIdentifier) {
+			if (sb.length() > 0) {
+				sb.append('.');
+			}
+			sb.append(scanner.getCurrentTokenSource());
+			token = scanner.getNextToken();
+			if (token == ITerminalSymbols.TokenNameDOT) {
+				token = scanner.getNextToken(); // read next identifier
+			} else {
+				break;
+			}
+		}
+		return sb.toString();
 	}
 
 	/**

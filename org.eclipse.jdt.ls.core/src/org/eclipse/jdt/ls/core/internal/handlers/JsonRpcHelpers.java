@@ -182,6 +182,11 @@ final public class JsonRpcHelpers {
 			if (document != null) {
 				return document;
 			}
+		} else if (buffer instanceof org.eclipse.jdt.ls.core.internal.SwapDocumentBuffer swap) {
+			IDocument document = swap.getDocument();
+			if (document != null) {
+				return document;
+			}
 		}
 		return new org.eclipse.jdt.internal.core.DocumentAdapter(buffer);
 	}

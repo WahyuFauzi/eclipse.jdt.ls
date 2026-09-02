@@ -30,6 +30,15 @@ public class DiagnosticsState {
 		customizedErrorLevels.put(uri, syntaxOnly ? ErrorLevel.SYNTAX_ERROR : ErrorLevel.COMPILATION_ERROR);
 	}
 
+	/**
+	 * Removes the customized error level for the given URI. This should be called
+	 * when a document is closed to prevent unbounded memory growth in
+	 * {@link #customizedErrorLevels}.
+	 */
+	public void removeErrorLevel(String uri) {
+		customizedErrorLevels.remove(uri);
+	}
+
 	public ErrorLevel getGlobalErrorLevel() {
 		return globalErrorLevel;
 	}

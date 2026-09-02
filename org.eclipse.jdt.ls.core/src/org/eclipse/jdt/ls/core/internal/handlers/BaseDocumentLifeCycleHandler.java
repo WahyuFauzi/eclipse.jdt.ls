@@ -68,6 +68,7 @@ import org.eclipse.jdt.ls.core.internal.JavaLanguageServerPlugin;
 import org.eclipse.jdt.ls.core.internal.JobHelpers;
 import org.eclipse.jdt.ls.core.internal.MovingAverage;
 import org.eclipse.jdt.ls.core.internal.ProjectUtils;
+import org.eclipse.jdt.ls.core.internal.SwapDocumentBuffer;
 import org.eclipse.jdt.ls.core.internal.contentassist.CompletionProposalUtils;
 import org.eclipse.jdt.ls.core.internal.corrections.DiagnosticsHelper;
 import org.eclipse.jdt.ls.core.internal.managers.InvisibleProjectImporter;
@@ -340,8 +341,10 @@ public abstract class BaseDocumentLifeCycleHandler {
 	}
 
 	public void didClose(DidCloseTextDocumentParams params) {
-		documentVersions.remove(params.getTextDocument().getUri());
-		lastSyncedDocumentLengths.remove(params.getTextDocument().getUri());
+		String uri = params.getTextDocument().getUri();
+		documentVersions.remove(uri);
+		lastSyncedDocumentLengths.remove(uri);
+		JavaLanguageServerPlugin.getNonProjectDiagnosticsState().removeErrorLevel(uri);
 		handleClosed(params);
 	}
 
@@ -596,6 +599,11 @@ public abstract class BaseDocumentLifeCycleHandler {
 				}
 				unit.discardWorkingCopy();
 				unit.becomeWorkingCopy(new NullProgressMonitor());
+				// After save, compress the document buffer to reduce memory usage
+				IBuffer buffer = unit.getBuffer();
+				if (buffer instanceof SwapDocumentBuffer swapBuffer) {
+					swapBuffer.compress();
+				}
 			} catch (JavaModelException e) {
 				JavaLanguageServerPlugin.logException("Error while handling document save. URI: " + uri, e);
 			}

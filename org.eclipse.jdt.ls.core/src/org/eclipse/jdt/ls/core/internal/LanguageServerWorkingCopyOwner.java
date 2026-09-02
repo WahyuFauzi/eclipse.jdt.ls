@@ -41,7 +41,7 @@ public final class LanguageServerWorkingCopyOwner extends WorkingCopyOwner {
 		ICompilationUnit original= workingCopy.getPrimary();
 		IResource resource= original.getResource();
 		if (resource instanceof IFile file) {
-			return new DocumentAdapter(workingCopy, file);
+			return new SwapDocumentBuffer(workingCopy, file);
 		}
 		return DocumentAdapter.Null;
 	}

@@ -31,6 +31,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Hashtable;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -646,7 +647,22 @@ public class Preferences {
 	public static final String INLAY_HINT_ID = UUID.randomUUID().toString();
 	public static final String TYPE_HIERARCHY_ID = UUID.randomUUID().toString();
 
-	public static final Set<String> DISCOVERED_STATIC_IMPORTS = new LinkedHashSet<>();
+	/**
+	 * Maximum number of entries in {@link #DISCOVERED_STATIC_IMPORTS} to prevent unbounded memory growth.
+	 */
+	private static final int MAX_DISCOVERED_STATIC_IMPORTS = 500;
+
+	/**
+	 * Bounded LRU-backed set of discovered static imports. Uses a {@link LinkedHashMap}
+	 * with {@code removeEldestEntry} to cap growth at {@value #MAX_DISCOVERED_STATIC_IMPORTS} entries.
+	 */
+	public static final Set<String> DISCOVERED_STATIC_IMPORTS = Collections.newSetFromMap(new LinkedHashMap<>(
+			MAX_DISCOVERED_STATIC_IMPORTS, 0.75f, true) {
+		@Override
+		protected boolean removeEldestEntry(java.util.Map.Entry<String, Boolean> eldest) {
+			return size() > MAX_DISCOVERED_STATIC_IMPORTS;
+		}
+	});
 
 	private static final String GRADLE_OFFLINE_MODE = "gradle.offline.mode";
 	private static final int DEFAULT_TAB_SIZE = 4;
@@ -1048,7 +1064,7 @@ public class Preferences {
 		cleanUpActionsOnSaveEnabled = false;
 		extractInterfaceReplaceEnabled = false;
 		telemetryEnabled = false;
-		validateAllOpenBuffersOnChanges = true;
+		validateAllOpenBuffersOnChanges = false;
 		diagnosticFilter = new ArrayList<>();
 		searchScope = SearchScope.all;
 	}
